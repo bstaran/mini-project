@@ -36,7 +36,7 @@ class Coupon:
 
     coupons: list["Coupon"] = []
 
-    def __init__(self, code: str, discount: Discount, name: str = "쿠폰 없음"):
+    def __init__(self, code: str, discount: Discount, name: str = ""):
         self.code = code
         self.discount = discount
         self.name = name
@@ -108,10 +108,23 @@ class Cart:
             raise ValueError("존재하지 않는 상품입니다.")
         if quantity <= 0:
             raise ValueError("품절된 상품입니다.")
-        if product.stock < quantity:
-            raise ValueError(
-                f"재고가 부족합니다. (담을 수 있는 수량: {product.stock}개)"
-            )
+
+        current_in_cart_quantity = 0
+        for item in self.items:
+            if item[0].id == product_id:
+                current_in_cart_quantity = item[1]
+                break
+
+        total_quantity = current_in_cart_quantity + quantity
+        if product.stock < total_quantity:
+            raise ValueError(f"재고가 부족합니다.")
+
+        for i, item in enumerate(self.items):
+            if item[0].id == product_id:
+                self.items[i] = (product, total_quantity)
+                product.stock -= quantity
+                return
+
         self.items.append((product, quantity))
 
     def add_items(self, products: list[tuple[Product, int]]):
@@ -123,7 +136,7 @@ class Cart:
         if not product:
             raise ValueError("존재하지 않는 상품입니다.")
         for item in self.items:
-            if item[0] == product:
+            if item[0].id == product_id:
                 product.stock += item[1]
                 self.items.remove(item)
                 return
@@ -230,8 +243,6 @@ Coupon.coupons.extend(coupons)
 
 # 장바구니 생성
 cart = Cart()
-
-# 쿠폰 생성
 
 
 # ---
