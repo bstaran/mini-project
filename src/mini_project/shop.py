@@ -41,11 +41,17 @@ class Coupon:
         self.discount = discount
         self.name = name
 
+    @classmethod
+    def display_registered_coupons(cls):
+        print("1. 쿠폰 없음")
+        for index, coupon in enumerate(cls.coupons, start=2):
+            print(f"{index}. {coupon.name}")
+
 
 class Product:
 
     _id_counter = 1
-    products: list["Product"] = []
+    products: dict[int, "Product"] = {}
 
     def __init__(self, name, price, stock):
         self.id = Product._id_counter
@@ -58,7 +64,7 @@ class Product:
         return f"{self.name}: ${self.price:.2f}"
 
     def display_registered_items(self):
-        for product in self.products:
+        for product in self.products.values():
             if product.stock == 0:
                 print(f"{product.id}. {product.name} - {product.price}원 (품절)")
             else:
@@ -96,7 +102,10 @@ class Cart:
             raise ValueError("쿠폰은 Coupon 객체여야 합니다.")
         self._coupon = value
 
-    def add_item(self, product: Product, quantity: int):
+    def add_item(self, product_id: int, quantity: int):
+        product = Product.products.get(product_id)
+        if not product:
+            raise ValueError("존재하지 않는 상품입니다.")
         if quantity <= 0:
             raise ValueError("품절된 상품입니다.")
         if product.stock < quantity:
@@ -107,9 +116,12 @@ class Cart:
 
     def add_items(self, products: list[tuple[Product, int]]):
         for product, quantity in products:
-            self.add_item(product, quantity)
+            self.add_item(product.id, quantity)
 
-    def remove_item(self, product: Product):
+    def remove_item(self, product_id: int):
+        product = Product.products.get(product_id)
+        if not product:
+            raise ValueError("존재하지 않는 상품입니다.")
         for item in self.items:
             if item[0] == product:
                 product.stock += item[1]
@@ -124,6 +136,7 @@ class Cart:
         return self.total_price
 
     def calculate_delivery_fee(self) -> int:
+        self.calculate_total_price()
         if self.total_price >= 30000:
             self.delivery_fee = 0
         else:
@@ -131,7 +144,6 @@ class Cart:
         return self.delivery_fee
 
     def calculate_final_price(self) -> int:
-        self.calculate_total_price()
         self.calculate_delivery_fee()
         if self._coupon:
             self.discount_amount = self._coupon.discount.get_discount_amount(
@@ -142,18 +154,29 @@ class Cart:
         self.final_price = self.total_price + self.delivery_fee - self.discount_amount
         return self.final_price
 
+    def apply_coupon(self, coupon_index: int):
+        if 1 <= coupon_index <= len(Coupon.coupons):
+            self.coupon = Coupon.coupons[coupon_index - 1]
+            print(f"'{self.coupon.name}' 쿠폰이 적용되었습니다.")
+        else:
+            print("존재하지 않는 쿠폰 번호입니다.")
+
     def display_receipt(self) -> None:
-        print("-" * 20)
+        print("-" * 40)
         for product, quantity in self.items:
             print(
                 f"{product.name:<15} x {quantity:<5}  ${product.price * quantity:<10}"
             )
-        print("-" * 20)
-        print(f"상품 합계 ${self.total_price:.2f}")
-        print(f"할인 ${self.discount_amount:.2f}")
-        print(f"배송비 ${self.delivery_fee:.2f}")
-        print(f"결제 금액 ${self.final_price:.2f}")
-        print("-" * 20)
+
+        self.calculate_final_price()
+        print("-" * 40)
+        print(f"상품 합계 {self.total_price:>20}원")
+        print(
+            f"할인 {self.discount_amount:>25}원   {self.coupon.name if self.coupon else '쿠폰 없음'}"
+        )
+        print(f"배송비 {self.delivery_fee:>23}원")
+        print(f"결제 금액 {self.final_price:>20}원")
+        print("-" * 40)
 
     def reset_cart(self) -> None:
         self.items.clear()
@@ -191,7 +214,7 @@ products = [
     Product("USB 허브", 18_000, 4),
 ]
 
-Product.products.extend(products)
+Product.products.update({p.id: p for p in products})
 
 # 기본 쿠폰 등록
 coupons = [
@@ -237,7 +260,7 @@ while True:
         cart.display_receipt()
 
     if choice == "5":
-        Coupon.display_registered_coupons(Coupon)
+        Coupon.display_registered_coupons()
         coupon_number = int(input("쿠폰 번호: "))
         cart.apply_coupon(coupon_number)
 
